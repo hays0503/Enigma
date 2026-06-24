@@ -24,51 +24,63 @@ namespace EnigmaMod.Patches
 
             IMessage message = MessageField.GetValue(__instance) as IMessage;
             if (message == null)
-            {
-                Debug.Log("[EnigmaMod] JournalMessageUI.Start: SKIP - message field is null");
                 return;
-            }
 
             if (playerShip == null)
-            {
-                Debug.Log("[EnigmaMod] JournalMessageUI.Start: SKIP - playerShip is null (not yet loaded?)");
                 return;
-            }
 
             TextMeshProUGUI contents = ContentsField.GetValue(__instance) as TextMeshProUGUI;
-            Debug.Log($"[EnigmaMod] JournalMessageUI.Start: senderName='{message.SenderName}', senderEntity={message.Sender?.Name}, encMethod={message.EncryptionMethod}, isOutgoing={(message.Sender == playerShip.SandboxEntity)}, isRead={message.IsRead}");
+            if (contents == null)
+                return;
 
             bool shouldEncrypt = ShouldEncrypt(message, playerShip);
-            Debug.Log($"[EnigmaMod] JournalMessageUI.Start: ShouldEncrypt={shouldEncrypt}");
-
             if (!shouldEncrypt)
                 return;
-
-            if (contents == null)
-            {
-                Debug.Log("[EnigmaMod] JournalMessageUI.Start: SKIP - contents TMP field is null");
-                return;
-            }
 
             string rawText = message.GetFormattedContents();
             string preprocessed = MessagePreprocessor.Preprocess(rawText);
             string ciphertext = CaesarCipher.Encrypt(preprocessed);
             string grouped = MessagePreprocessor.FormatCiphertext(ciphertext);
+            string messageId = message.SenderName + "|" + message.Date.Ticks;
 
-            Debug.Log($"[EnigmaMod] Encrypting message: preprocessed='{preprocessed.Substring(0, Mathf.Min(preprocessed.Length, 100))}', ciphertext='{ciphertext.Substring(0, Mathf.Min(ciphertext.Length, 100))}'");
+            DecryptionRegistry.Init();
 
-            contents.text = $"<b>{Localization.GetCiphertextLabel()}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}";
+            if (!DecryptionRegistry.IsDecrypted(messageId))
+            {
+                DecryptionRegistry.StartDecryption(messageId, ciphertext.Length, ciphertext, rawText);
+
+                int revealed = DecryptionRegistry.GetProgress(messageId);
+                string label = Localization.GetCiphertextLabel();
+
+                if (revealed <= 0)
+                {
+                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#888888>{Localization.GetUndecryptedLabel()}</color>";
+                }
+                else if (revealed >= ciphertext.Length)
+                {
+                    contents.text = rawText;
+                }
+                else
+                {
+                    int percent = revealed * 100 / ciphertext.Length;
+                    string revealedText = rawText.Substring(0, revealed);
+                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#ffff00>{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length} ({percent}%)</color>\n{revealedText}<color=#00ff00>█</color>";
+                }
+            }
+            else
+            {
+                string plaintext = DecryptionRegistry.GetPlaintext(messageId);
+                if (plaintext != null)
+                {
+                    contents.text = plaintext;
+                }
+            }
+
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
 
             var fitter = __instance.GetComponent<ChildrenSizeFitter>();
             if (fitter != null)
-            {
                 fitter.Fit();
-            }
-            else
-            {
-                Debug.Log("[EnigmaMod] JournalMessageUI.Start: ChildrenSizeFitter not found on instance");
-            }
         }
 
         private static PlayerShip GetPlayerShip()
@@ -79,32 +91,14 @@ namespace EnigmaMod.Patches
         private static bool ShouldEncrypt(IMessage message, PlayerShip playerShip)
         {
             if (message.Sender == playerShip.SandboxEntity)
-            {
-                Debug.Log("[EnigmaMod] ShouldEncrypt: FALSE - message is outgoing (sender == player)");
                 return false;
-            }
-
             if (message.Sender == null)
-            {
-                Debug.Log("[EnigmaMod] ShouldEncrypt: FALSE - sender is null");
                 return false;
-            }
-
             if (message.Sender.Country == null)
-            {
-                Debug.Log($"[EnigmaMod] ShouldEncrypt: FALSE - sender.Country is null (sender={message.Sender.Name})");
                 return false;
-            }
-
             if (playerShip.Country == null)
-            {
-                Debug.Log("[EnigmaMod] ShouldEncrypt: FALSE - playerShip.Country is null");
                 return false;
-            }
-
-            bool result = message.Sender.Country == playerShip.Country;
-            Debug.Log($"[EnigmaMod] ShouldEncrypt: {result} (sender.Country={message.Sender.Country.CountryCode}, player.Country={playerShip.Country.CountryCode})");
-            return result;
+            return message.Sender.Country == playerShip.Country;
         }
     }
 }
