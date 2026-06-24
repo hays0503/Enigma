@@ -1,4 +1,5 @@
 using System.Reflection;
+using DWS.Common.InjectionFramework;
 using HarmonyLib;
 using TMPro;
 using UBOAT.Game.Sandbox.Messages;
@@ -56,7 +57,7 @@ namespace EnigmaMod.Patches
 
             Debug.Log($"[EnigmaMod] Encrypting message: preprocessed='{preprocessed.Substring(0, Mathf.Min(preprocessed.Length, 100))}', ciphertext='{ciphertext.Substring(0, Mathf.Min(ciphertext.Length, 100))}'");
 
-            contents.text = $"<b>Шифрограмма</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}";
+            contents.text = $"<b>{Localization.GetCiphertextLabel()}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}";
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
 
             var fitter = __instance.GetComponent<ChildrenSizeFitter>();

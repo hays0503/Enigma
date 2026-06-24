@@ -1,3 +1,4 @@
+using DWS.Common.InjectionFramework;
 using HarmonyLib;
 using UBOAT.Game.Core;
 using UBOAT.Game.Sandbox.Messages;
@@ -50,7 +51,7 @@ namespace EnigmaMod.Patches
             Debug.Log($"[EnigmaMod] RadioStory encrypting: preprocessed='{preprocessed.Substring(0, Mathf.Min(preprocessed.Length, 80))}'");
 
             __result = LocalizedString.CreateUnlocalized(
-                $"<b>Шифрограмма</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}"
+                $"<b>{Localization.GetCiphertextLabel()}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}"
             );
         }
 
