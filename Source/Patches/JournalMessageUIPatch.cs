@@ -74,10 +74,6 @@ namespace EnigmaMod.Patches
             }
 
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
-
-            var fitter = __instance.GetComponent<ChildrenSizeFitter>();
-            if (fitter != null)
-                fitter.Fit();
         }
 
         private static string BuildProgressBar(int filled, int total, int maxBlocks = 20)
