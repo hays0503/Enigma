@@ -18,9 +18,9 @@ namespace EnigmaMod.Patches
     internal static class RadioStoryPatch
     {
         private static string currentMessageId;
-        private static bool waitingForKeyPress;
         private static RadioStory activeStory;
         private static bool updateListenerRegistered;
+        private static int lastRevealed;
 
         private static readonly FieldInfo ContentsOverrideField = AccessTools.Field(typeof(RadioStory), "contentsOverride");
         private static readonly MethodInfo OnUpdatedMethod = AccessTools.Method(typeof(Story), "OnUpdated");
@@ -55,21 +55,10 @@ namespace EnigmaMod.Patches
                 DecryptionRegistry.StartDecryption(currentMessageId, ciphertext.Length, ciphertext, rawText);
 
                 int revealed = DecryptionRegistry.GetProgress(currentMessageId);
-                string label = Localization.GetCiphertextLabel();
+                lastRevealed = revealed;
+                string radiomanName = GetRadiomanName(__instance);
 
-                if (revealed <= 0)
-                {
-                    waitingForKeyPress = true;
-                    __result = LocalizedString.CreateUnlocalized(
-                        $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#CC5500>{Localization.GetPressSpaceLabel()}</color>"
-                    );
-                }
-                else
-                {
-                    waitingForKeyPress = false;
-                    string radiomanName = GetRadiomanName(__instance);
-                    __result = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, ciphertext.Length, rawText.Substring(0, Math.Min(revealed, rawText.Length))));
-                }
+                __result = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, ciphertext.Length, rawText.Substring(0, Math.Min(revealed, rawText.Length))));
 
                 RegisterUpdateListener(__instance);
             }
@@ -79,7 +68,7 @@ namespace EnigmaMod.Patches
                 if (plaintext != null)
                 {
                     __result = LocalizedString.CreateUnlocalized(
-                        $"── {Localization.GetDecryptedLabel()} ──\n{plaintext}"
+                        $"\u2500\u2500 {Localization.GetDecryptedLabel()} \u2500\u2500\n{plaintext}"
                     );
                 }
             }
@@ -92,7 +81,6 @@ namespace EnigmaMod.Patches
             RemoveUpdateListener(__instance);
             activeStory = null;
             currentMessageId = null;
-            waitingForKeyPress = false;
         }
 
         private static void UpdateDecryption()
@@ -104,17 +92,38 @@ namespace EnigmaMod.Patches
             if (storyPlayer == null || !storyPlayer.IsOpened || storyPlayer.Story != activeStory)
                 return;
 
-            if (waitingForKeyPress && Input.GetKeyDown(KeyCode.Space))
+            if (DecryptionRegistry.IsDecrypted(currentMessageId))
             {
-                waitingForKeyPress = false;
-                RefreshRadioDisplay();
+                int revealed = DecryptionRegistry.GetProgress(currentMessageId);
+                if (revealed != lastRevealed)
+                {
+                    lastRevealed = revealed;
+                    ShowDecryptedAndCleanup();
+                }
                 return;
             }
 
-            if (!waitingForKeyPress && !DecryptionRegistry.IsDecrypted(currentMessageId))
+            int progress = DecryptionRegistry.GetProgress(currentMessageId);
+            if (progress != lastRevealed)
             {
+                lastRevealed = progress;
                 RefreshRadioDisplay();
             }
+        }
+
+        private static void ShowDecryptedAndCleanup()
+        {
+            if (activeStory == null || currentMessageId == null)
+                return;
+
+            string plaintext = DecryptionRegistry.GetPlaintext(currentMessageId);
+            var newContents = LocalizedString.CreateUnlocalized(
+                $"\u2500\u2500 {Localization.GetDecryptedLabel()} \u2500\u2500\n{plaintext}"
+            );
+            ContentsOverrideField.SetValue(activeStory, newContents);
+            OnUpdatedMethod.Invoke(activeStory, null);
+            ShowNotification();
+            RemoveUpdateListener(activeStory);
         }
 
         private static void RefreshRadioDisplay()
@@ -122,47 +131,27 @@ namespace EnigmaMod.Patches
             if (activeStory == null || currentMessageId == null)
                 return;
 
-            string ciphertext = DecryptionRegistry.GetCiphertext(currentMessageId);
             string plaintext = DecryptionRegistry.GetPlaintext(currentMessageId);
-
+            string ciphertext = DecryptionRegistry.GetCiphertext(currentMessageId);
             if (ciphertext == null)
                 return;
 
             int totalChars = ciphertext.Length;
             int revealed = DecryptionRegistry.GetProgress(currentMessageId);
             string radiomanName = GetRadiomanName(activeStory);
+            string revealedText = (plaintext ?? "").Substring(0, Math.Min(revealed, plaintext?.Length ?? 0));
 
-            LocalizedString newContents;
-
-            if (revealed <= 0)
-            {
-                return;
-            }
-            else if (revealed >= totalChars)
-            {
-                newContents = LocalizedString.CreateUnlocalized(
-                    $"── {Localization.GetDecryptedLabel()} ──\n{plaintext}"
-                );
-                ContentsOverrideField.SetValue(activeStory, newContents);
-                OnUpdatedMethod.Invoke(activeStory, null);
-                ShowNotification();
-                RemoveUpdateListener(activeStory);
-            }
-            else
-            {
-                string revealedText = (plaintext ?? "").Substring(0, Math.Min(revealed, plaintext?.Length ?? 0));
-                newContents = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, totalChars, revealedText));
-                ContentsOverrideField.SetValue(activeStory, newContents);
-                OnUpdatedMethod.Invoke(activeStory, null);
-            }
+            var newContents = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, totalChars, revealedText));
+            ContentsOverrideField.SetValue(activeStory, newContents);
+            OnUpdatedMethod.Invoke(activeStory, null);
         }
 
         private static string BuildDecryptionView(string radiomanName, int revealed, int totalChars, string revealedText)
         {
             var sb = new StringBuilder();
-            sb.Append($"── {radiomanName} ──\n");
+            sb.Append($"\u2500\u2500 {radiomanName} \u2500\u2500\n");
             sb.Append(BuildProgressBar(revealed, totalChars));
-            int percent = revealed * 100 / totalChars;
+            int percent = revealed * 100 / Math.Max(totalChars, 1);
             sb.Append($"  {percent}%\n");
             sb.Append(new string('\u2500', 28));
             sb.Append($"\n{Localization.GetDecryptingLabel()}: {revealed}/{totalChars}\n\n");
@@ -173,7 +162,7 @@ namespace EnigmaMod.Patches
 
         private static string BuildProgressBar(int filled, int total, int maxBlocks = 24)
         {
-            int filledBlocks = filled * maxBlocks / total;
+            int filledBlocks = Math.Min(filled * maxBlocks / Math.Max(total, 1), maxBlocks);
             int emptyBlocks = maxBlocks - filledBlocks;
 
             var sb = new StringBuilder();
