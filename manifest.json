@@ -1,0 +1,10 @@
+{
+    "name": "Enigma Cipher",
+    "version": "1.0.0",
+    "description": "Adds visual Enigma-style encryption to German messages. Ciphertext is shown above decrypted text in the journal and radio operator view.",
+    "author": "Modder",
+    "supportedGameVersions": [],
+    "assemblyName": "EnigmaMod",
+    "permissions": ["Reflection"],
+    "steamFileId": 0
+}
