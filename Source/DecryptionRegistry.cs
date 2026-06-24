@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using DWS.Common.InjectionFramework;
+using UBOAT.Game.Core.Time;
 using UnityEngine;
 
 namespace EnigmaMod
@@ -9,7 +11,7 @@ namespace EnigmaMod
     public class DecryptionState
     {
         public string MessageId;
-        public string StartTime;
+        public long StartTick;
         public int TotalChars;
         public bool IsDecrypted;
         public string Ciphertext;
@@ -27,8 +29,9 @@ namespace EnigmaMod
         private static readonly Dictionary<string, DecryptionState> states = new Dictionary<string, DecryptionState>();
         private static string savePath;
         private static bool initialized;
+        private static GameTime gameTime;
 
-        public static Action<string> OnDecryptionCompleted;
+        private const long TicksPerChar = 18000000000L;
 
         public static void Init()
         {
@@ -36,21 +39,19 @@ namespace EnigmaMod
                 return;
             initialized = true;
             savePath = Path.Combine(Application.persistentDataPath, "EnigmaMod", "decryption.json");
+            gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
             Load();
         }
 
         public static bool IsDecrypted(string messageId)
         {
             Init();
-            if (states.TryGetValue(messageId, out var s))
-            {
-                if (s.IsDecrypted)
-                    return true;
-
-                int expired = GetProgress(messageId);
-                return s.IsDecrypted;
-            }
-            return false;
+            if (!states.TryGetValue(messageId, out var s))
+                return false;
+            if (s.IsDecrypted)
+                return true;
+            GetProgress(messageId);
+            return s.IsDecrypted;
         }
 
         public static int GetProgress(string messageId)
@@ -61,22 +62,13 @@ namespace EnigmaMod
             if (state.IsDecrypted)
                 return state.TotalChars;
 
-            DateTime startTime;
-            if (!DateTime.TryParse(state.StartTime, out startTime))
-                return 0;
-
-            var elapsed = DateTime.Now - startTime;
-            int revealed = Math.Min(state.TotalChars, (int)(elapsed.TotalSeconds / 4.0));
+            long elapsedTicks = gameTime.CurrentDateTime.Ticks - state.StartTick;
+            int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
 
             if (revealed >= state.TotalChars)
             {
                 state.IsDecrypted = true;
                 Save();
-                if (OnDecryptionCompleted != null)
-                {
-                    try { OnDecryptionCompleted(messageId); }
-                    catch { }
-                }
             }
 
             return revealed;
@@ -85,16 +77,13 @@ namespace EnigmaMod
         public static void StartDecryption(string messageId, int totalChars, string ciphertext, string plaintext)
         {
             Init();
-            if (states.ContainsKey(messageId) && states[messageId].IsDecrypted)
-                return;
-
-            if (states.ContainsKey(messageId) && !states[messageId].IsDecrypted)
+            if (states.ContainsKey(messageId))
                 return;
 
             states[messageId] = new DecryptionState
             {
                 MessageId = messageId,
-                StartTime = DateTime.Now.ToString("O"),
+                StartTick = gameTime.CurrentDateTime.Ticks,
                 TotalChars = totalChars,
                 IsDecrypted = false,
                 Ciphertext = ciphertext,
@@ -106,19 +95,13 @@ namespace EnigmaMod
         public static string GetCiphertext(string messageId)
         {
             Init();
-            DecryptionState state;
-            if (states.TryGetValue(messageId, out state))
-                return state.Ciphertext;
-            return null;
+            return states.TryGetValue(messageId, out var s) ? s.Ciphertext : null;
         }
 
         public static string GetPlaintext(string messageId)
         {
             Init();
-            DecryptionState state;
-            if (states.TryGetValue(messageId, out state))
-                return state.Plaintext;
-            return null;
+            return states.TryGetValue(messageId, out var s) ? s.Plaintext : null;
         }
 
         private static void Save()

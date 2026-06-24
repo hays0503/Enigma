@@ -1,10 +1,12 @@
 using System;
 using System.Reflection;
+using System.Text;
 using DWS.Common.InjectionFramework;
 using HarmonyLib;
 using UBOAT.Game.Core;
 using UBOAT.Game.Sandbox.Messages;
 using UBOAT.Game.Scene;
+using UBOAT.Game.Scene.Characters;
 using UBOAT.Game.Scene.Entities;
 using UBOAT.Game.Scene.Stories;
 using UBOAT.Game.UI;
@@ -23,6 +25,10 @@ namespace EnigmaMod.Patches
         private static readonly FieldInfo ContentsOverrideField = AccessTools.Field(typeof(RadioStory), "contentsOverride");
         private static readonly MethodInfo OnUpdatedMethod = AccessTools.Method(typeof(Story), "OnUpdated");
         private static readonly FieldInfo StoryPlayerField = AccessTools.Field(typeof(Story), "storyPlayerUI");
+        private static readonly FieldInfo CharacterField = AccessTools.Field(typeof(RadioStory), "character");
+
+        private const string FilledBlock = "\u2593";
+        private const string EmptyBlock = "\u2591";
 
         [HarmonyPatch("GetFormattedMessageContents")]
         [HarmonyPostfix]
@@ -55,22 +61,14 @@ namespace EnigmaMod.Patches
                 {
                     waitingForKeyPress = true;
                     __result = LocalizedString.CreateUnlocalized(
-                        $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#888888>{Localization.GetPressSpaceLabel()}</color>"
-                    );
-                }
-                else if (revealed >= ciphertext.Length)
-                {
-                    __result = LocalizedString.CreateUnlocalized(
-                        $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n--- {Localization.GetDecryptedLabel()} ---\n{rawText}"
+                        $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#CC5500>{Localization.GetPressSpaceLabel()}</color>"
                     );
                 }
                 else
                 {
-                    int percent = revealed * 100 / ciphertext.Length;
-                    string revealedText = rawText.Substring(0, revealed);
-                    __result = LocalizedString.CreateUnlocalized(
-                        $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#ffff00>{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length} ({percent}%)</color>\n{revealedText}<color=#00ff00>█</color>"
-                    );
+                    waitingForKeyPress = false;
+                    string radiomanName = GetRadiomanName(__instance);
+                    __result = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, ciphertext.Length, rawText.Substring(0, Math.Min(revealed, rawText.Length))));
                 }
 
                 RegisterUpdateListener(__instance);
@@ -80,7 +78,9 @@ namespace EnigmaMod.Patches
                 string plaintext = DecryptionRegistry.GetPlaintext(currentMessageId);
                 if (plaintext != null)
                 {
-                    __result = LocalizedString.CreateUnlocalized(plaintext);
+                    __result = LocalizedString.CreateUnlocalized(
+                        $"── {Localization.GetDecryptedLabel()} ──\n{plaintext}"
+                    );
                 }
             }
         }
@@ -130,8 +130,7 @@ namespace EnigmaMod.Patches
 
             int totalChars = ciphertext.Length;
             int revealed = DecryptionRegistry.GetProgress(currentMessageId);
-            string grouped = MessagePreprocessor.FormatCiphertext(ciphertext);
-            string label = Localization.GetCiphertextLabel();
+            string radiomanName = GetRadiomanName(activeStory);
 
             LocalizedString newContents;
 
@@ -142,7 +141,7 @@ namespace EnigmaMod.Patches
             else if (revealed >= totalChars)
             {
                 newContents = LocalizedString.CreateUnlocalized(
-                    $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n--- {Localization.GetDecryptedLabel()} ---\n{plaintext}"
+                    $"── {Localization.GetDecryptedLabel()} ──\n{plaintext}"
                 );
                 ContentsOverrideField.SetValue(activeStory, newContents);
                 OnUpdatedMethod.Invoke(activeStory, null);
@@ -151,14 +150,48 @@ namespace EnigmaMod.Patches
             }
             else
             {
-                int percent = revealed * 100 / totalChars;
                 string revealedText = (plaintext ?? "").Substring(0, Math.Min(revealed, plaintext?.Length ?? 0));
-                newContents = LocalizedString.CreateUnlocalized(
-                    $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#ffff00>{Localization.GetDecryptingLabel()}: {revealed}/{totalChars} ({percent}%)</color>\n{revealedText}<color=#00ff00>█</color>"
-                );
+                newContents = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, totalChars, revealedText));
                 ContentsOverrideField.SetValue(activeStory, newContents);
                 OnUpdatedMethod.Invoke(activeStory, null);
             }
+        }
+
+        private static string BuildDecryptionView(string radiomanName, int revealed, int totalChars, string revealedText)
+        {
+            var sb = new StringBuilder();
+            sb.Append($"── {radiomanName} ──\n");
+            sb.Append(BuildProgressBar(revealed, totalChars));
+            int percent = revealed * 100 / totalChars;
+            sb.Append($"  {percent}%\n");
+            sb.Append(new string('\u2500', 28));
+            sb.Append($"\n{Localization.GetDecryptingLabel()}: {revealed}/{totalChars}\n\n");
+            sb.Append(revealedText);
+            sb.Append("<color=#00ff00>\u2588</color>");
+            return sb.ToString();
+        }
+
+        private static string BuildProgressBar(int filled, int total, int maxBlocks = 24)
+        {
+            int filledBlocks = filled * maxBlocks / total;
+            int emptyBlocks = maxBlocks - filledBlocks;
+
+            var sb = new StringBuilder();
+            sb.Append("<color=#CC5500>");
+            for (int i = 0; i < filledBlocks; i++)
+                sb.Append(FilledBlock);
+            sb.Append("</color>");
+            sb.Append("<color=#1a0a00>");
+            for (int i = 0; i < emptyBlocks; i++)
+                sb.Append(EmptyBlock);
+            sb.Append("</color>");
+            return sb.ToString();
+        }
+
+        private static string GetRadiomanName(RadioStory story)
+        {
+            var character = CharacterField.GetValue(story) as PlayableCharacter;
+            return character?.Name ?? "Radio Operator";
         }
 
         private static void RegisterUpdateListener(RadioStory story)

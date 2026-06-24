@@ -1,10 +1,9 @@
 using System.Reflection;
-using DWS.Common.InjectionFramework;
+using System.Text;
 using HarmonyLib;
 using TMPro;
 using UBOAT.Game.Sandbox.Messages;
 using UBOAT.Game.Scene.Entities;
-using UBOAT.Game.UI;
 using UBOAT.Game.UI.Journal;
 using UnityEngine;
 
@@ -16,17 +15,16 @@ namespace EnigmaMod.Patches
         private static readonly FieldInfo MessageField = AccessTools.Field(typeof(JournalMessageUI), "message");
         private static readonly FieldInfo ContentsField = AccessTools.Field(typeof(JournalMessageUI), "contents");
 
+        private const string FilledBlock = "\u2593";
+        private const string EmptyBlock = "\u2591";
+
         [HarmonyPatch("Start")]
         [HarmonyPostfix]
         private static void OnStart(JournalMessageUI __instance)
         {
             PlayerShip playerShip = GetPlayerShip();
-
             IMessage message = MessageField.GetValue(__instance) as IMessage;
-            if (message == null)
-                return;
-
-            if (playerShip == null)
+            if (message == null || playerShip == null)
                 return;
 
             TextMeshProUGUI contents = ContentsField.GetValue(__instance) as TextMeshProUGUI;
@@ -64,16 +62,15 @@ namespace EnigmaMod.Patches
                 {
                     int percent = revealed * 100 / ciphertext.Length;
                     string revealedText = rawText.Substring(0, revealed);
-                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#ffff00>{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length} ({percent}%)</color>\n{revealedText}<color=#00ff00>█</color>";
+                    string bar = BuildProgressBar(revealed, ciphertext.Length);
+                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length}\n\n{revealedText}<color=#00ff00>\u2588</color>";
                 }
             }
             else
             {
                 string plaintext = DecryptionRegistry.GetPlaintext(messageId);
                 if (plaintext != null)
-                {
                     contents.text = plaintext;
-                }
             }
 
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
@@ -81,6 +78,23 @@ namespace EnigmaMod.Patches
             var fitter = __instance.GetComponent<ChildrenSizeFitter>();
             if (fitter != null)
                 fitter.Fit();
+        }
+
+        private static string BuildProgressBar(int filled, int total, int maxBlocks = 20)
+        {
+            int filledBlocks = filled * maxBlocks / total;
+            int emptyBlocks = maxBlocks - filledBlocks;
+
+            var sb = new StringBuilder();
+            sb.Append("<color=#CC5500>");
+            for (int i = 0; i < filledBlocks; i++)
+                sb.Append(FilledBlock);
+            sb.Append("</color>");
+            sb.Append("<color=#1a0a00>");
+            for (int i = 0; i < emptyBlocks; i++)
+                sb.Append(EmptyBlock);
+            sb.Append("</color>");
+            return sb.ToString();
         }
 
         private static PlayerShip GetPlayerShip()
