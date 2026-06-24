@@ -5,15 +5,16 @@ namespace EnigmaMod
 {
     public static class Localization
     {
-        public static string GetCiphertextLabel()
+        public static string GetCurrentLanguage()
         {
             var locale = ScriptableObjectSingleton.LoadSingleton<Locale>() as ILocale;
-            if (locale == null)
-                return "ШИФРОГРАММА";
+            return locale?.Language?.ToLower() ?? "english";
+        }
 
-            switch (locale.Language.ToLower())
+        public static string GetCiphertextLabel()
+        {
+            switch (GetCurrentLanguage())
             {
-                case "english": return "CIPHERTEXT";
                 case "german": return "CHIFFRAT";
                 case "russian": return "ШИФРОГРАММА";
                 default: return "CIPHERTEXT";

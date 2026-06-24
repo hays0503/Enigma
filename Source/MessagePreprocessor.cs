@@ -9,13 +9,23 @@ namespace EnigmaMod
             if (string.IsNullOrEmpty(text))
                 return text;
 
-            text = text.ToUpperInvariant().Replace("CH", "Q");
+            LanguageRules rules = PreprocessRules.ForLanguage(Localization.GetCurrentLanguage());
 
-            StringBuilder sb = new StringBuilder(text.Length);
+            string processed = text.ToUpperInvariant();
+            if (rules.ReplaceChWithQ)
+                processed = processed.Replace("CH", "Q");
+
+            StringBuilder sb = new StringBuilder(processed.Length);
             StringBuilder digitRun = new StringBuilder();
 
-            foreach (char c in text)
+            foreach (char c in processed)
             {
+                if (c == 'ß')
+                {
+                    sb.Append("SS");
+                    continue;
+                }
+
                 if (c >= '0' && c <= '9')
                 {
                     digitRun.Append(c);
@@ -24,33 +34,27 @@ namespace EnigmaMod
 
                 if (digitRun.Length > 0)
                 {
-                    sb.Append(ProcessDigitRun(digitRun.ToString()));
+                    sb.Append(ProcessDigitRun(digitRun.ToString(), rules));
                     digitRun.Clear();
                 }
 
-                switch (c)
+                if (rules.Punct.TryGetValue(c, out string replacement))
                 {
-                    case '.': sb.Append('X'); break;
-                    case ',': sb.Append('Y'); break;
-                    case '?': sb.Append("FRAGE"); break;
-                    case ':': sb.Append("XX"); break;
-                    case '-': case '–': case '—': case '/': sb.Append("YY"); break;
-                    case '(': case ')': sb.Append("KK"); break;
-                    case 'ß': sb.Append("SS"); break;
-                    default:
-                        if (char.IsLetter(c))
-                            sb.Append(c);
-                        break;
+                    sb.Append(replacement);
+                }
+                else if (char.IsLetter(c))
+                {
+                    sb.Append(c);
                 }
             }
 
             if (digitRun.Length > 0)
-                sb.Append(ProcessDigitRun(digitRun.ToString()));
+                sb.Append(ProcessDigitRun(digitRun.ToString(), rules));
 
             return sb.ToString();
         }
 
-        private static string ProcessDigitRun(string digits)
+        private static string ProcessDigitRun(string digits, LanguageRules rules)
         {
             StringBuilder sb = new StringBuilder();
             int i = 0;
@@ -63,36 +67,18 @@ namespace EnigmaMod
                         i++;
                     int zeroCount = i - start;
 
-                    while (zeroCount >= 4) { sb.Append("MYRIA"); zeroCount -= 4; }
-                    while (zeroCount >= 3) { sb.Append("MILLE"); zeroCount -= 3; }
-                    while (zeroCount >= 2) { sb.Append("CENTA"); zeroCount -= 2; }
-                    while (zeroCount >= 1) { sb.Append("NULL"); zeroCount--; }
+                    while (zeroCount >= 4) { sb.Append(rules.Zero4); zeroCount -= 4; }
+                    while (zeroCount >= 3) { sb.Append(rules.Zero3); zeroCount -= 3; }
+                    while (zeroCount >= 2) { sb.Append(rules.Zero2); zeroCount -= 2; }
+                    while (zeroCount >= 1) { sb.Append(rules.Digits['0']); zeroCount--; }
                 }
                 else
                 {
-                    sb.Append(DigitToWord(digits[i]));
+                    sb.Append(rules.Digits[digits[i]]);
                     i++;
                 }
             }
             return sb.ToString();
-        }
-
-        private static string DigitToWord(char d)
-        {
-            switch (d)
-            {
-                case '0': return "NULL";
-                case '1': return "EINZ";
-                case '2': return "ZWO";
-                case '3': return "DREI";
-                case '4': return "VIER";
-                case '5': return "FUNF";
-                case '6': return "SEQS";
-                case '7': return "SIEBEN";
-                case '8': return "AQT";
-                case '9': return "NEUN";
-                default: return "";
-            }
         }
 
         public static string FormatCiphertext(string text)
