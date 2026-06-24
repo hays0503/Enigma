@@ -49,12 +49,14 @@ namespace EnigmaMod.Patches
                 return;
             }
 
-            string plaintext = message.GetFormattedContents();
-            string ciphertext = CaesarCipher.Encrypt(plaintext);
+            string rawText = message.GetFormattedContents();
+            string preprocessed = MessagePreprocessor.Preprocess(rawText);
+            string ciphertext = CaesarCipher.Encrypt(preprocessed);
+            string grouped = MessagePreprocessor.FormatCiphertext(ciphertext);
 
-            Debug.Log($"[EnigmaMod] Encrypting message: plaintext='{plaintext.Substring(0, Mathf.Min(plaintext.Length, 100))}', ciphertext='{ciphertext.Substring(0, Mathf.Min(ciphertext.Length, 100))}'");
+            Debug.Log($"[EnigmaMod] Encrypting message: preprocessed='{preprocessed.Substring(0, Mathf.Min(preprocessed.Length, 100))}', ciphertext='{ciphertext.Substring(0, Mathf.Min(ciphertext.Length, 100))}'");
 
-            contents.text = $"<color=#888888><size=75%>{ciphertext}</size></color>\n\n{plaintext}";
+            contents.text = $"<b>Шифрограмма</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}";
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
 
             var fitter = __instance.GetComponent<ChildrenSizeFitter>();

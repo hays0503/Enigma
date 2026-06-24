@@ -42,13 +42,15 @@ namespace EnigmaMod.Patches
             if (!shouldEncrypt)
                 return;
 
-            string plaintext = __result;
-            string ciphertext = CaesarCipher.Encrypt(plaintext);
+            string rawText = __result;
+            string preprocessed = MessagePreprocessor.Preprocess(rawText);
+            string ciphertext = CaesarCipher.Encrypt(preprocessed);
+            string grouped = MessagePreprocessor.FormatCiphertext(ciphertext);
 
-            Debug.Log($"[EnigmaMod] RadioStory encrypting: plaintext='{plaintext.Substring(0, Mathf.Min(plaintext.Length, 80))}'");
+            Debug.Log($"[EnigmaMod] RadioStory encrypting: preprocessed='{preprocessed.Substring(0, Mathf.Min(preprocessed.Length, 80))}'");
 
             __result = LocalizedString.CreateUnlocalized(
-                $"<color=#888888><size=75%>{ciphertext}</size></color>\n\n{plaintext}"
+                $"<b>Шифрограмма</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{rawText}"
             );
         }
 
