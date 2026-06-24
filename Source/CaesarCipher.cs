@@ -1,4 +1,5 @@
 using System.Text;
+using UnityEngine;
 
 namespace EnigmaMod
 {
@@ -14,14 +15,19 @@ namespace EnigmaMod
         public static string Encrypt(string text)
         {
             if (string.IsNullOrEmpty(text))
+            {
+                Debug.Log("[EnigmaMod] CaesarCipher.Encrypt: input is null or empty");
                 return text;
+            }
 
             var sb = new StringBuilder(text.Length);
             foreach (char c in text)
             {
                 sb.Append(ShiftChar(c));
             }
-            return sb.ToString();
+            string result = sb.ToString();
+            Debug.Log($"[EnigmaMod] CaesarCipher.Encrypt: inputLen={text.Length}, outputLen={result.Length}, preview='{Truncate(result, 50)}'");
+            return result;
         }
 
         public static string Decrypt(string text)
@@ -50,6 +56,11 @@ namespace EnigmaMod
                 return CyrillicLower[(idx + Shift) % 33];
 
             return c;
+        }
+
+        private static string Truncate(string s, int max)
+        {
+            return s.Length <= max ? s : s.Substring(0, max) + "...";
         }
     }
 }

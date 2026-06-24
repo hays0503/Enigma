@@ -1,4 +1,5 @@
 using System.Text;
+using UnityEngine;
 
 namespace EnigmaMod
 {
@@ -7,13 +8,22 @@ namespace EnigmaMod
         public static string Preprocess(string text)
         {
             if (string.IsNullOrEmpty(text))
+            {
+                Debug.Log("[EnigmaMod] Preprocess: input is null or empty");
                 return text;
+            }
 
-            LanguageRules rules = PreprocessRules.ForLanguage(Localization.GetCurrentLanguage());
+            string lang = Localization.GetCurrentLanguage();
+            LanguageRules rules = PreprocessRules.ForLanguage(lang);
+
+            Debug.Log($"[EnigmaMod] Preprocess: lang={lang}, inputLen={text.Length}, inputPreview='{Truncate(text, 60)}'");
 
             string processed = text.ToUpperInvariant();
             if (rules.ReplaceChWithQ)
+            {
                 processed = processed.Replace("CH", "Q");
+                Debug.Log("[EnigmaMod] Preprocess: replaced CH→Q (German rule)");
+            }
 
             StringBuilder sb = new StringBuilder(processed.Length);
             StringBuilder digitRun = new StringBuilder();
@@ -51,7 +61,9 @@ namespace EnigmaMod
             if (digitRun.Length > 0)
                 sb.Append(ProcessDigitRun(digitRun.ToString(), rules));
 
-            return sb.ToString();
+            string result = sb.ToString();
+            Debug.Log($"[EnigmaMod] Preprocess: outputLen={result.Length}, outputPreview='{Truncate(result, 60)}'");
+            return result;
         }
 
         private static string ProcessDigitRun(string digits, LanguageRules rules)
@@ -78,7 +90,9 @@ namespace EnigmaMod
                     i++;
                 }
             }
-            return sb.ToString();
+            string result = sb.ToString();
+            Debug.Log($"[EnigmaMod] Preprocess.ProcessDigitRun: digits='{digits}' → '{result}' (len={result.Length})");
+            return result;
         }
 
         public static string FormatCiphertext(string text)
@@ -93,7 +107,14 @@ namespace EnigmaMod
                     sb.Append(' ');
                 sb.Append(text[i]);
             }
-            return sb.ToString();
+            string result = sb.ToString();
+            Debug.Log($"[EnigmaMod] FormatCiphertext: inputLen={text.Length}, outputLen={result.Length}, preview='{Truncate(result, 60)}'");
+            return result;
+        }
+
+        private static string Truncate(string s, int max)
+        {
+            return s.Length <= max ? s : s.Substring(0, max) + "...";
         }
     }
 }

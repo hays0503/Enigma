@@ -32,6 +32,7 @@ namespace EnigmaMod
         private static GameTime gameTime;
 
         private const long TicksPerChar = 18000000000L;
+        private const string LogTag = "[EnigmaMod] DecryptionRegistry";
 
         public static void Init()
         {
@@ -39,7 +40,14 @@ namespace EnigmaMod
                 return;
             initialized = true;
             savePath = Path.Combine(Application.persistentDataPath, "EnigmaMod", "decryption.json");
+            Debug.Log($"{LogTag}.Init: savePath='{savePath}'");
+
             gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
+            if (gameTime != null)
+                Debug.Log($"{LogTag}.Init: GameTime obtained, currentDateTime={gameTime.CurrentDateTime:O}");
+            else
+                Debug.LogError($"{LogTag}.Init: FAILED to get GameTime instance");
+
             Load();
         }
 
@@ -47,10 +55,17 @@ namespace EnigmaMod
         {
             Init();
             if (!states.TryGetValue(messageId, out var s))
+            {
+                Debug.Log($"{LogTag}.IsDecrypted('{messageId}'): false — no state found");
                 return false;
+            }
             if (s.IsDecrypted)
+            {
+                Debug.Log($"{LogTag}.IsDecrypted('{messageId}'): true — already marked decrypted");
                 return true;
+            }
             GetProgress(messageId);
+            Debug.Log($"{LogTag}.IsDecrypted('{messageId}'): {s.IsDecrypted} (rechecked progress)");
             return s.IsDecrypted;
         }
 
@@ -58,16 +73,26 @@ namespace EnigmaMod
         {
             Init();
             if (!states.TryGetValue(messageId, out var state))
+            {
+                Debug.LogWarning($"{LogTag}.GetProgress('{messageId}'): -1 — no state found");
                 return -1;
+            }
             if (state.IsDecrypted)
+            {
+                Debug.Log($"{LogTag}.GetProgress('{messageId}'): already decrypted ({state.TotalChars}/{state.TotalChars})");
                 return state.TotalChars;
+            }
 
-            long elapsedTicks = gameTime.CurrentDateTime.Ticks - state.StartTick;
+            long nowTicks = gameTime.CurrentDateTime.Ticks;
+            long elapsedTicks = nowTicks - state.StartTick;
             int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
+
+            Debug.Log($"{LogTag}.GetProgress('{messageId}'): nowTick={nowTicks}, startTick={state.StartTick}, elapsedTicks={elapsedTicks}, ticksPerChar={TicksPerChar}, revealed={revealed}/{state.TotalChars}");
 
             if (revealed >= state.TotalChars)
             {
                 state.IsDecrypted = true;
+                Debug.Log($"{LogTag}.GetProgress('{messageId}'): COMPLETE — marking as decrypted");
                 Save();
             }
 
@@ -78,12 +103,18 @@ namespace EnigmaMod
         {
             Init();
             if (states.ContainsKey(messageId))
+            {
+                Debug.Log($"{LogTag}.StartDecryption('{messageId}'): already exists, skipping (wasDecrypted={states[messageId].IsDecrypted})");
                 return;
+            }
+
+            long startTick = gameTime.CurrentDateTime.Ticks;
+            Debug.Log($"{LogTag}.StartDecryption('{messageId}'): totalChars={totalChars}, startTick={startTick}, now={gameTime.CurrentDateTime:O}");
 
             states[messageId] = new DecryptionState
             {
                 MessageId = messageId,
-                StartTick = gameTime.CurrentDateTime.Ticks,
+                StartTick = startTick,
                 TotalChars = totalChars,
                 IsDecrypted = false,
                 Ciphertext = ciphertext,
@@ -95,13 +126,25 @@ namespace EnigmaMod
         public static string GetCiphertext(string messageId)
         {
             Init();
-            return states.TryGetValue(messageId, out var s) ? s.Ciphertext : null;
+            if (states.TryGetValue(messageId, out var s))
+            {
+                Debug.Log($"{LogTag}.GetCiphertext('{messageId}'): found, len={s.Ciphertext?.Length ?? 0}");
+                return s.Ciphertext;
+            }
+            Debug.LogWarning($"{LogTag}.GetCiphertext('{messageId}'): not found, returning null");
+            return null;
         }
 
         public static string GetPlaintext(string messageId)
         {
             Init();
-            return states.TryGetValue(messageId, out var s) ? s.Plaintext : null;
+            if (states.TryGetValue(messageId, out var s))
+            {
+                Debug.Log($"{LogTag}.GetPlaintext('{messageId}'): found, len={s.Plaintext?.Length ?? 0}");
+                return s.Plaintext;
+            }
+            Debug.LogWarning($"{LogTag}.GetPlaintext('{messageId}'): not found, returning null");
+            return null;
         }
 
         private static void Save()
@@ -110,14 +153,19 @@ namespace EnigmaMod
             {
                 var dir = Path.GetDirectoryName(savePath);
                 if (!Directory.Exists(dir))
+                {
                     Directory.CreateDirectory(dir);
+                    Debug.Log($"{LogTag}.Save: created directory '{dir}'");
+                }
 
                 var data = new DecryptionSaveData { States = new List<DecryptionState>(states.Values) };
-                File.WriteAllText(savePath, JsonUtility.ToJson(data, true));
+                string json = JsonUtility.ToJson(data, true);
+                File.WriteAllText(savePath, json);
+                Debug.Log($"{LogTag}.Save: saved {states.Count} states to '{savePath}' ({json.Length} bytes)");
             }
             catch (Exception e)
             {
-                Debug.LogError("[EnigmaMod] Failed to save decryption registry: " + e.Message);
+                Debug.LogError($"{LogTag}.Save: FAILED — {e.Message}");
             }
         }
 
@@ -126,19 +174,30 @@ namespace EnigmaMod
             try
             {
                 if (!File.Exists(savePath))
+                {
+                    Debug.Log($"{LogTag}.Load: no save file at '{savePath}'");
                     return;
+                }
 
-                var data = JsonUtility.FromJson<DecryptionSaveData>(File.ReadAllText(savePath));
+                string json = File.ReadAllText(savePath);
+                var data = JsonUtility.FromJson<DecryptionSaveData>(json);
                 if (data?.States != null)
                 {
                     states.Clear();
                     foreach (var state in data.States)
                         states[state.MessageId] = state;
+                    Debug.Log($"{LogTag}.Load: loaded {states.Count} states from '{savePath}' ({json.Length} bytes)");
+                    foreach (var kv in states)
+                        Debug.Log($"{LogTag}.Load:   '{kv.Key}': totalChars={kv.Value.TotalChars}, isDecrypted={kv.Value.IsDecrypted}, startTick={kv.Value.StartTick}");
+                }
+                else
+                {
+                    Debug.LogWarning($"{LogTag}.Load: save file exists but data is null or empty (jsonLen={json.Length})");
                 }
             }
             catch (Exception e)
             {
-                Debug.LogError("[EnigmaMod] Failed to load decryption registry: " + e.Message);
+                Debug.LogError($"{LogTag}.Load: FAILED — {e.Message}");
             }
         }
     }

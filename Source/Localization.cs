@@ -1,14 +1,23 @@
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Data;
+using UnityEngine;
 
 namespace EnigmaMod
 {
     public static class Localization
     {
+        private static bool loggedLanguage;
+
         public static string GetCurrentLanguage()
         {
             var locale = ScriptableObjectSingleton.LoadSingleton<Locale>() as ILocale;
-            return locale?.Language?.ToLower() ?? "english";
+            string lang = locale?.Language?.ToLower() ?? "english";
+            if (!loggedLanguage)
+            {
+                Debug.Log($"[EnigmaMod] Localization.GetCurrentLanguage: detected '{lang}' (locale={locale?.GetType()?.Name ?? "null"})");
+                loggedLanguage = true;
+            }
+            return lang;
         }
 
         public static string GetCiphertextLabel()
