@@ -32,7 +32,7 @@ namespace EnigmaMod
         private static bool initialized;
         private static GameTime gameTime;
 
-        private const long TicksPerChar = 18000000000L;
+        private const long TicksPerChar = 600000000L;
         private const string LogTag = "[EnigmaMod] DecryptionRegistry";
 
         private static bool TryGetGameTime()

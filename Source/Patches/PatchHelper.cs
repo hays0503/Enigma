@@ -14,8 +14,8 @@ namespace EnigmaMod.Patches
     {
         private const string LogTag = "[EnigmaMod] PatchHelper";
 
-        internal const string FilledBlock = "\u2593";
-        internal const string EmptyBlock = "\u2591";
+        internal const string FilledBlock = "#";
+        internal const string EmptyBlock = "-";
 
         internal static string BuildProgressBar(int filled, int total, int maxBlocks = 20)
         {

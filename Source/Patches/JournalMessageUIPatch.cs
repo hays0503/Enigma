@@ -79,7 +79,7 @@ namespace EnigmaMod.Patches
                     string revealedText = rawText.Substring(0, Math.Min(plainRevealed, rawText.Length));
                     string bar = PatchHelper.BuildProgressBar(revealed, ciphertext.Length);
                     Debug.Log($"{LogTag}.OnStart: showing DECRYPTING — {revealed}/{ciphertext.Length} ({percent}%)");
-                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length}\n\n{revealedText}<color=#00ff00>\u2588</color>";
+                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length}\n\n{revealedText}<color=#00ff00>|</color>";
                 }
             }
             else

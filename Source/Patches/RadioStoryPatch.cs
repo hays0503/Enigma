@@ -88,7 +88,7 @@ namespace EnigmaMod.Patches
                 if (plaintext != null)
                 {
                     __result = LocalizedString.CreateUnlocalized(
-                        $"\u2500\u2500 {Localization.GetDecryptedLabel()} \u2500\u2500\n{plaintext}"
+                        $"==== {Localization.GetDecryptedLabel()} ====\n{plaintext}"
                     );
                 }
             }
@@ -169,7 +169,7 @@ namespace EnigmaMod.Patches
             Debug.Log($"{LogTag}.ShowDecryptedAndCleanup: showing DECRYPTED, plaintextLen={plaintext?.Length ?? 0}");
 
             var newContents = LocalizedString.CreateUnlocalized(
-                $"\u2500\u2500 {Localization.GetDecryptedLabel()} \u2500\u2500\n{plaintext}"
+                $"==== {Localization.GetDecryptedLabel()} ====\n{plaintext}"
             );
             ContentsOverrideField.SetValue(story, newContents);
             OnUpdatedMethod.Invoke(story, null);
@@ -210,14 +210,14 @@ namespace EnigmaMod.Patches
         private static string BuildDecryptionView(string radiomanName, int revealed, int totalChars, string revealedText)
         {
             var sb = new StringBuilder();
-            sb.Append($"\u2500\u2500 {radiomanName} \u2500\u2500\n");
+            sb.Append($"==== {radiomanName} ====\n");
             sb.Append(PatchHelper.BuildProgressBar(revealed, totalChars, 24));
             int percent = revealed * 100 / Math.Max(totalChars, 1);
             sb.Append($"  {percent}%\n");
-            sb.Append(new string('\u2500', 28));
+            sb.Append(new string('=', 28));
             sb.Append($"\n{Localization.GetDecryptingLabel()}: {revealed}/{totalChars}\n\n");
             sb.Append(revealedText);
-            sb.Append("<color=#00ff00>\u2588</color>");
+            sb.Append("<color=#00ff00>|</color>");
             return sb.ToString();
         }
 
