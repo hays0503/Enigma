@@ -41,7 +41,6 @@ namespace EnigmaMod
         private const long TicksPerChar = 10000000L;
         private const long SaveIntervalTicks = 5 * TimeSpan.TicksPerSecond;
         private const string LogTag = "[EnigmaMod] DecryptionRegistry";
-        private static string currentCampaignId;
         private static long lastSaveRealTick;
 
         private static bool TryGetGameTime()
@@ -108,15 +107,12 @@ namespace EnigmaMod
 
         private static string GetCampaignId()
         {
-            if (currentCampaignId != null)
-                return currentCampaignId;
-
             var career = InjectionFramework.Instance.GetInstance<PlayerCareer>();
             if (career != null && !string.IsNullOrEmpty(career.StartScenarioId))
             {
-                currentCampaignId = $"{career.StartScenarioId}_{career.StartDate.Ticks}";
-                Debug.Log($"{LogTag}.GetCampaignId: '{currentCampaignId}'");
-                return currentCampaignId;
+                string id = $"{career.StartScenarioId}_{career.StartDate.Ticks}";
+                Debug.Log($"{LogTag}.GetCampaignId: '{id}'");
+                return id;
             }
             return null;
         }
@@ -155,7 +151,7 @@ namespace EnigmaMod
             Debug.Log($"{LogTag}.Init: savePath='{savePath}'");
 
             TryGetGameTime();
-            GetCampaignId();
+            Debug.Log($"{LogTag}.Init: campaignId='{GetCampaignId()}'");
             Load();
         }
 
@@ -302,7 +298,13 @@ namespace EnigmaMod
                     Debug.Log($"{LogTag}.Save: created directory '{dir}'");
                 }
 
-                string campaignId = currentCampaignId ?? GetCampaignId();
+                string campaignId = GetCampaignId();
+                if (campaignId == null)
+                {
+                    Debug.LogWarning($"{LogTag}.Save: no CampaignId, skipping save");
+                    return;
+                }
+
                 var data = new DecryptionSaveData
                 {
                     CampaignId = campaignId,
@@ -339,9 +341,10 @@ namespace EnigmaMod
                         return;
                     }
 
-                    if (currentCampaignId == null || storedCampaignId != currentCampaignId)
+                    string currentId = GetCampaignId();
+                    if (currentId == null || storedCampaignId != currentId)
                     {
-                        Debug.Log($"{LogTag}.Load: CampaignId mismatch (stored='{storedCampaignId}', current='{currentCampaignId}'), discarding states");
+                        Debug.Log($"{LogTag}.Load: CampaignId mismatch (stored='{storedCampaignId}', current='{currentId}'), discarding states");
                         return;
                     }
 
