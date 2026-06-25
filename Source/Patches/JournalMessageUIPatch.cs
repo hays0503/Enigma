@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using DWS.Common.InjectionFramework;
 using HarmonyLib;
 using TMPro;
@@ -181,12 +182,12 @@ namespace EnigmaMod.Patches
                 string bar = PatchHelper.BuildProgressBar(progress, state.TotalChars);
                 string label = Localization.GetCiphertextLabel();
 
-                var contents = ContentsField.GetValue(instance) as TextMeshProUGUI;
-                if (contents != null)
-                {
-                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>";
-                    contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
-                }
+                    var tmpContents = ContentsField.GetValue(instance) as TextMeshProUGUI;
+                    if (tmpContents != null)
+                    {
+                        tmpContents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>";
+                        tmpContents.rectTransform.sizeDelta = new Vector2(tmpContents.rectTransform.sizeDelta.x, tmpContents.preferredHeight);
+                    }
             }
 
             foreach (var key in toRemove)
