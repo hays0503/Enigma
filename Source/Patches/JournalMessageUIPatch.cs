@@ -23,26 +23,26 @@ namespace EnigmaMod.Patches
 
         private const string LogTag = "[EnigmaMod] JournalMessageUIPatch";
 
-        [HarmonyPatch("OnEnable")]
+        [HarmonyPatch("Start")]
         [HarmonyPostfix]
-        private static void OnEnable(JournalMessageUI __instance)
+        private static void OnStart(JournalMessageUI __instance)
         {
             PlayerShip playerShip = PatchHelper.GetPlayerShip();
             IMessage message = MessageField.GetValue(__instance) as IMessage;
             if (message == null || playerShip == null)
             {
-                Debug.Log($"{LogTag}.OnEnable: SKIP — message={message != null}, playerShip={playerShip != null}");
+                Debug.Log($"{LogTag}.OnStart: SKIP — message={message != null}, playerShip={playerShip != null}");
                 return;
             }
 
             TextMeshProUGUI contents = ContentsField.GetValue(__instance) as TextMeshProUGUI;
             if (contents == null)
             {
-                Debug.Log($"{LogTag}.OnEnable: SKIP — contents TMP field is null");
+                Debug.Log($"{LogTag}.OnStart: SKIP — contents TMP field is null");
                 return;
             }
 
-            Debug.Log($"{LogTag}.OnEnable: senderName='{message.SenderName}', senderCountry={message.Sender?.Country?.CountryCode ?? "NULL"}, encMethod={message.EncryptionMethod}");
+            Debug.Log($"{LogTag}.OnStart: senderName='{message.SenderName}', senderCountry={message.Sender?.Country?.CountryCode ?? "NULL"}, encMethod={message.EncryptionMethod}");
 
             bool shouldEncrypt = PatchHelper.ShouldEncrypt(message, playerShip, "Journal");
             if (!shouldEncrypt)
@@ -54,7 +54,7 @@ namespace EnigmaMod.Patches
             string grouped = MessagePreprocessor.FormatCiphertext(ciphertext);
             string messageId = PatchHelper.CreateMessageId(message);
 
-            Debug.Log($"{LogTag}.OnEnable: rawLen={rawText.Length}, ciphertextLen={ciphertext.Length}, messageId='{messageId}'");
+            Debug.Log($"{LogTag}.OnStart: rawLen={rawText.Length}, ciphertextLen={ciphertext.Length}, messageId='{messageId}'");
 
             DecryptionRegistry.Init();
             activeInstances[__instance] = messageId;
@@ -68,12 +68,12 @@ namespace EnigmaMod.Patches
 
                 if (revealed <= 0)
                 {
-                    Debug.Log($"{LogTag}.OnEnable: showing ENCRYPTED (no progress yet)");
+                    Debug.Log($"{LogTag}.OnStart: showing ENCRYPTED (no progress yet)");
                     contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n<color=#888888>{Localization.GetUndecryptedLabel()}</color>";
                 }
                 else if (revealed >= ciphertext.Length)
                 {
-                    Debug.Log($"{LogTag}.OnEnable: showing DECRYPTED (progress complete)");
+                    Debug.Log($"{LogTag}.OnStart: showing DECRYPTED (progress complete)");
                     contents.text = rawText;
                 }
                 else
@@ -90,20 +90,12 @@ namespace EnigmaMod.Patches
             else
             {
                 string plaintext = DecryptionRegistry.GetPlaintext(messageId);
-                Debug.Log($"{LogTag}.OnEnable: already decrypted — plaintextLen={plaintext?.Length ?? 0}");
+                Debug.Log($"{LogTag}.OnStart: already decrypted — plaintextLen={plaintext?.Length ?? 0}");
                 if (plaintext != null)
                     contents.text = plaintext;
             }
 
             contents.rectTransform.sizeDelta = new Vector2(contents.rectTransform.sizeDelta.x, contents.preferredHeight);
-        }
-
-        [HarmonyPatch("OnDisable")]
-        [HarmonyPostfix]
-        private static void OnDisable(JournalMessageUI __instance)
-        {
-            activeInstances.Remove(__instance);
-            RemoveUpdateListenerIfEmpty();
         }
 
         private static void RegisterUpdateListener()
