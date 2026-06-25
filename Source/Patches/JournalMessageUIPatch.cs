@@ -27,6 +27,15 @@ namespace EnigmaMod.Patches
         [HarmonyPostfix]
         private static void OnStart(JournalMessageUI __instance)
         {
+            IMessage clickMsg = MessageField.GetValue(__instance) as IMessage;
+            if (clickMsg != null)
+            {
+                string clickMsgId = PatchHelper.CreateMessageId(clickMsg);
+                bool clickDecrypted = DecryptionRegistry.IsDecrypted(clickMsgId);
+                int clickProgress = DecryptionRegistry.GetProgress(clickMsgId);
+                Debug.Log($"{LogTag}[CLICK] OnStart: messageId='{clickMsgId}', isDecrypted={clickDecrypted}, progress={clickProgress}");
+            }
+
             PlayerShip playerShip = PatchHelper.GetPlayerShip();
             IMessage message = MessageField.GetValue(__instance) as IMessage;
             if (message == null || playerShip == null)

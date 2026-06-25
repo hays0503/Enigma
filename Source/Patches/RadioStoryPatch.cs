@@ -45,6 +45,11 @@ namespace EnigmaMod.Patches
                 return;
             }
 
+            string msgId = PatchHelper.CreateMessageId(message);
+            bool isDecrypted = DecryptionRegistry.IsDecrypted(msgId);
+            int progress = DecryptionRegistry.GetProgress(msgId);
+            Debug.Log($"{LogTag}[CLICK] GetFormattedMessageContents: messageId='{msgId}', isDecrypted={isDecrypted}, progress={progress}");
+
             Debug.Log($"{LogTag}.GetFormattedMessageContents: senderName='{message.SenderName}', senderCountry={message.Sender?.Country?.CountryCode ?? "NULL"}, encMethod={message.EncryptionMethod}");
 
             bool shouldEncrypt = PatchHelper.ShouldEncrypt(message, playerShip, "RadioStory");

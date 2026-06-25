@@ -63,11 +63,18 @@ namespace EnigmaMod
                     var val = prop.GetValue(gameTime, null);
                     if (val != null)
                     {
-                        double s = Convert.ToDouble(val);
-                        if (s > 0)
+                        try
                         {
-                            cachedGameSpeed = s;
-                            return s;
+                            double s = Convert.ToDouble(val);
+                            if (s > 0)
+                            {
+                                cachedGameSpeed = s;
+                                return s;
+                            }
+                        }
+                        catch
+                        {
+                            // свойство существует, но это не число (например, Parameter) — fallback на дельта-трекинг
                         }
                     }
                 }
