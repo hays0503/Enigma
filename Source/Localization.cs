@@ -45,7 +45,7 @@ namespace EnigmaMod
             switch (GetCurrentLanguage())
             {
                 case "german": return "Entschlüssle";
-                case "russian": return "Расшифровано";
+                case "russian": return "Расшифровка";
                 default: return "Decrypting";
             }
         }
@@ -55,7 +55,7 @@ namespace EnigmaMod
             switch (GetCurrentLanguage())
             {
                 case "german": return "ENTSCHLÜSSELT";
-                case "russian": return "РАСШИФРОВАННО";
+                case "russian": return "РАСШИФРОВАНО";
                 default: return "DECRYPTED";
             }
         }
@@ -65,7 +65,7 @@ namespace EnigmaMod
             switch (GetCurrentLanguage())
             {
                 case "german": return "Nicht entschlüsselt";
-                case "russian": return "Не расшифрованно";
+                case "russian": return "Не расшифровано";
                 default: return "Not decrypted";
             }
         }
@@ -75,7 +75,7 @@ namespace EnigmaMod
             switch (GetCurrentLanguage())
             {
                 case "german": return "Funknachricht entschlüsselt";
-                case "russian": return "Радиограмма расшифрованна";
+                case "russian": return "Радиограмма расшифрована";
                 default: return "Radio message decoded";
             }
         }

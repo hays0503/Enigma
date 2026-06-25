@@ -13,6 +13,7 @@ namespace EnigmaMod
         public string MessageId;
         public long StartTick;
         public int TotalChars;
+        public int PlaintextLength;
         public bool IsDecrypted;
         public string Ciphertext;
         public string Plaintext;
@@ -34,6 +35,20 @@ namespace EnigmaMod
         private const long TicksPerChar = 18000000000L;
         private const string LogTag = "[EnigmaMod] DecryptionRegistry";
 
+        private static bool TryGetGameTime()
+        {
+            if (gameTime != null)
+                return true;
+
+            gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
+            if (gameTime != null)
+                Debug.Log($"{LogTag}.Init: GameTime obtained, currentDateTime={gameTime.CurrentDateTime:O}");
+            else
+                Debug.LogError($"{LogTag}.TryGetGameTime: FAILED to get GameTime instance");
+
+            return gameTime != null;
+        }
+
         public static void Init()
         {
             if (initialized)
@@ -42,12 +57,7 @@ namespace EnigmaMod
             savePath = Path.Combine(Application.persistentDataPath, "EnigmaMod", "decryption.json");
             Debug.Log($"{LogTag}.Init: savePath='{savePath}'");
 
-            gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
-            if (gameTime != null)
-                Debug.Log($"{LogTag}.Init: GameTime obtained, currentDateTime={gameTime.CurrentDateTime:O}");
-            else
-                Debug.LogError($"{LogTag}.Init: FAILED to get GameTime instance");
-
+            TryGetGameTime();
             Load();
         }
 
@@ -83,6 +93,12 @@ namespace EnigmaMod
                 return state.TotalChars;
             }
 
+            if (!TryGetGameTime())
+            {
+                Debug.LogWarning($"{LogTag}.GetProgress('{messageId}'): GameTime unavailable, returning 0");
+                return 0;
+            }
+
             long nowTicks = gameTime.CurrentDateTime.Ticks;
             long elapsedTicks = nowTicks - state.StartTick;
             int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
@@ -108,6 +124,12 @@ namespace EnigmaMod
                 return;
             }
 
+            if (!TryGetGameTime())
+            {
+                Debug.LogError($"{LogTag}.StartDecryption('{messageId}'): GameTime unavailable, cannot start decryption");
+                return;
+            }
+
             long startTick = gameTime.CurrentDateTime.Ticks;
             Debug.Log($"{LogTag}.StartDecryption('{messageId}'): totalChars={totalChars}, startTick={startTick}, now={gameTime.CurrentDateTime:O}");
 
@@ -116,11 +138,19 @@ namespace EnigmaMod
                 MessageId = messageId,
                 StartTick = startTick,
                 TotalChars = totalChars,
+                PlaintextLength = plaintext?.Length ?? 0,
                 IsDecrypted = false,
                 Ciphertext = ciphertext,
                 Plaintext = plaintext
             };
             Save();
+        }
+
+        public static DecryptionState GetState(string messageId)
+        {
+            Init();
+            states.TryGetValue(messageId, out var state);
+            return state;
         }
 
         public static string GetCiphertext(string messageId)
