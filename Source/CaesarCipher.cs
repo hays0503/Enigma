@@ -32,7 +32,50 @@ namespace EnigmaMod
 
         public static string Decrypt(string text)
         {
-            return Encrypt(text);
+            if (string.IsNullOrEmpty(text))
+            {
+                Debug.Log("[EnigmaMod] CaesarCipher.Decrypt: input is null or empty");
+                return text;
+            }
+
+            var sb = new StringBuilder(text.Length);
+            foreach (char c in text)
+            {
+                int idx;
+
+                idx = LatinUpper.IndexOf(c);
+                if (idx != -1)
+                {
+                    sb.Append(LatinUpper[(idx + Shift) % 26]);
+                    continue;
+                }
+
+                idx = LatinLower.IndexOf(c);
+                if (idx != -1)
+                {
+                    sb.Append(LatinLower[(idx + Shift) % 26]);
+                    continue;
+                }
+
+                idx = CyrillicUpper.IndexOf(c);
+                if (idx != -1)
+                {
+                    sb.Append(CyrillicUpper[(idx + 33 - Shift) % 33]);
+                    continue;
+                }
+
+                idx = CyrillicLower.IndexOf(c);
+                if (idx != -1)
+                {
+                    sb.Append(CyrillicLower[(idx + 33 - Shift) % 33]);
+                    continue;
+                }
+
+                sb.Append(c);
+            }
+            string result = sb.ToString();
+            Debug.Log($"[EnigmaMod] CaesarCipher.Decrypt: inputLen={text.Length}, outputLen={result.Length}, preview='{Truncate(result, 50)}'");
+            return result;
         }
 
         private static char ShiftChar(char c)

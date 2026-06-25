@@ -174,12 +174,12 @@ namespace EnigmaMod.Patches
                 string bar = PatchHelper.BuildProgressBar(progress, state.TotalChars);
                 string label = Localization.GetCiphertextLabel();
 
-                    var tmpContents = ContentsField.GetValue(instance) as TextMeshProUGUI;
-                    if (tmpContents != null)
-                    {
-                        tmpContents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>";
-                        tmpContents.rectTransform.sizeDelta = new Vector2(tmpContents.rectTransform.sizeDelta.x, tmpContents.preferredHeight);
-                    }
+                var tmpContents = ContentsField.GetValue(instance) as TextMeshProUGUI;
+                if (tmpContents != null)
+                {
+                    tmpContents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>";
+                    tmpContents.rectTransform.sizeDelta = new Vector2(tmpContents.rectTransform.sizeDelta.x, tmpContents.preferredHeight);
+                }
             }
 
             foreach (var key in toRemove)

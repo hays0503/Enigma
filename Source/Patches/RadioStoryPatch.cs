@@ -41,7 +41,7 @@ namespace EnigmaMod.Patches
             PlayerShip playerShip = PatchHelper.GetPlayerShip();
             if (message == null || __result == null || playerShip == null)
             {
-                Debug.Log($"{LogTag}.GetFormattedMessageContents: SKIP — message={message != null}, __result={__result != null}, playerShip={playerShip != null}");
+                Debug.Log($"{LogTag}.GetFormattedMessageContents: SKIP — message={message != null}, playerShip={playerShip != null}");
                 return;
             }
 
@@ -61,7 +61,7 @@ namespace EnigmaMod.Patches
             string messageId = PatchHelper.CreateMessageId(message);
             var ctx = GetOrCreateContext(__instance, messageId);
 
-            Debug.Log($"{LogTag}.GetFormattedMessageContents: rawLen={rawText.Length}, preprocessedLen={preprocessed.Length}, ciphertextLen={ciphertext.Length}, messageId='{messageId}'");
+            Debug.Log($"{LogTag}.GetFormattedMessageContents: rawLen={rawText?.Length ?? 0}, preprocessedLen={preprocessed?.Length ?? 0}, ciphertextLen={ciphertext?.Length ?? 0}, messageId='{messageId}'");
 
             if (!DecryptionRegistry.IsDecrypted(messageId))
             {
