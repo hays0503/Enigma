@@ -162,6 +162,12 @@ namespace EnigmaMod
                 return state.TotalChars;
             }
 
+            if (!TryGetGameTime())
+            {
+                Debug.LogError($"{LogTag}.GetProgress('{messageId}'): GameTime unavailable");
+                return -1;
+            }
+
             long nowTicks = gameTime.CurrentDateTime.Ticks;
             long elapsedTicks = nowTicks - state.StartTick;
             int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
@@ -184,6 +190,12 @@ namespace EnigmaMod
             if (states.ContainsKey(messageId))
             {
                 Debug.Log($"{LogTag}.StartDecryption('{messageId}'): already exists, skipping (wasDecrypted={states[messageId].IsDecrypted})");
+                return;
+            }
+
+            if (!TryGetGameTime())
+            {
+                Debug.LogError($"{LogTag}.StartDecryption('{messageId}'): GameTime unavailable, cannot start decryption");
                 return;
             }
 
