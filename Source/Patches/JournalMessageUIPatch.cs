@@ -82,7 +82,9 @@ namespace EnigmaMod.Patches
                     int plainRevealed = PatchHelper.GetRevealedPlaintextChars(messageId);
                     string revealedText = rawText.Substring(0, Math.Min(plainRevealed, rawText.Length));
                     string bar = PatchHelper.BuildProgressBar(revealed, ciphertext.Length);
-                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length}\n\n{revealedText}<color=#00ff00>|</color>";
+                    string remaining = PatchHelper.FormatRemainingTime(DecryptionRegistry.GetEstimatedTimeRemaining(messageId));
+                    string eta = string.IsNullOrEmpty(remaining) ? "" : $"\n<color=#888888>{remaining}</color>";
+                    contents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{grouped}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {revealed}/{ciphertext.Length}\n\n{revealedText}<color=#00ff00>|</color>{eta}";
                 }
 
                 RegisterUpdateListener();
@@ -174,10 +176,13 @@ namespace EnigmaMod.Patches
                 string bar = PatchHelper.BuildProgressBar(progress, state.TotalChars);
                 string label = Localization.GetCiphertextLabel();
 
+                string remaining = PatchHelper.FormatRemainingTime(DecryptionRegistry.GetEstimatedTimeRemaining(messageId));
+                string eta = string.IsNullOrEmpty(remaining) ? "" : $"\n<color=#888888>{remaining}</color>";
+
                 var tmpContents = ContentsField.GetValue(instance) as TextMeshProUGUI;
                 if (tmpContents != null)
                 {
-                    tmpContents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>";
+                    tmpContents.text = $"<b>{label}</b>\n<color=#888888><size=75%>{MessagePreprocessor.FormatCiphertext(state.Ciphertext)}</size></color>\n\n{bar}  {percent}%\n{Localization.GetDecryptingLabel()}: {progress}/{state.TotalChars}\n\n{revealedText}<color=#00ff00>|</color>{eta}";
                     tmpContents.rectTransform.sizeDelta = new Vector2(tmpContents.rectTransform.sizeDelta.x, tmpContents.preferredHeight);
                 }
             }

@@ -79,5 +79,15 @@ namespace EnigmaMod
                 default: return "Radio message decoded";
             }
         }
+
+        public static string GetPausedLabel()
+        {
+            switch (GetCurrentLanguage())
+            {
+                case "german": return "[PAUSE]";
+                case "russian": return "[ПАУЗА]";
+                default: return "[PAUSED]";
+            }
+        }
     }
 }

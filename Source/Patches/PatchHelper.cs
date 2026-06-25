@@ -109,6 +109,20 @@ namespace EnigmaMod.Patches
             }
         }
 
+        internal static string FormatRemainingTime(TimeSpan time)
+        {
+            if (time == TimeSpan.MaxValue)
+                return Localization.GetPausedLabel();
+            if (time.TotalSeconds <= 0)
+                return "";
+
+            if (time.TotalHours >= 1)
+                return $"~{time.Hours}h {time.Minutes}m";
+            if (time.TotalMinutes >= 1)
+                return $"~{time.Minutes}m {time.Seconds}s";
+            return $"~{time.Seconds}s";
+        }
+
         internal static string CreateMessageId(IMessage message)
         {
             return message.SenderName + "|" + message.Date.Ticks;

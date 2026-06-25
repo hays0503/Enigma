@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using DWS.Common.InjectionFramework;
+using UBOAT.Game.Core.Time;
 using UnityEngine;
 
 namespace EnigmaMod
@@ -28,8 +31,92 @@ namespace EnigmaMod
         private static readonly Dictionary<string, DecryptionState> states = new Dictionary<string, DecryptionState>();
         private static string savePath;
         private static bool initialized;
+        private static GameTime gameTime;
+        private static long lastSpeedRealTick;
+        private static long lastSpeedGameTick;
+        private static double cachedGameSpeed = 1.0;
         private const long TicksPerChar = 10000000L;
         private const string LogTag = "[EnigmaMod] DecryptionRegistry";
+
+        private static bool TryGetGameTime()
+        {
+            if (gameTime != null)
+                return true;
+
+            gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
+            if (gameTime != null)
+                Debug.Log($"{LogTag}.Init: GameTime obtained, currentDateTime={gameTime.CurrentDateTime:O}");
+            else
+                Debug.LogError($"{LogTag}.TryGetGameTime: FAILED to get GameTime instance");
+
+            return gameTime != null;
+        }
+
+        private static double GetGameSpeed()
+        {
+            if (gameTime != null)
+            {
+                var type = gameTime.GetType();
+                var prop = type.GetProperty("TimeScale") ?? type.GetProperty("Speed") ?? type.GetProperty("TimeMultiplier");
+                if (prop != null)
+                {
+                    var val = prop.GetValue(gameTime, null);
+                    if (val != null)
+                    {
+                        double s = Convert.ToDouble(val);
+                        if (s > 0)
+                        {
+                            cachedGameSpeed = s;
+                            return s;
+                        }
+                    }
+                }
+            }
+
+            long nowReal = DateTime.UtcNow.Ticks;
+            long nowGame = gameTime?.CurrentDateTime.Ticks ?? nowReal;
+
+            if (lastSpeedRealTick != 0 && lastSpeedGameTick != 0)
+            {
+                long realDelta = nowReal - lastSpeedRealTick;
+                long gameDelta = nowGame - lastSpeedGameTick;
+                if (realDelta > 0 && gameDelta >= 0)
+                {
+                    double s = (double)gameDelta / realDelta;
+                    if (s >= 0 && s < 100000)
+                        cachedGameSpeed = (cachedGameSpeed * 0.7) + (s * 0.3);
+                }
+            }
+
+            lastSpeedRealTick = nowReal;
+            lastSpeedGameTick = nowGame;
+            return cachedGameSpeed;
+        }
+
+        public static TimeSpan GetEstimatedTimeRemaining(string messageId)
+        {
+            if (!states.TryGetValue(messageId, out var state) || state.IsDecrypted)
+                return TimeSpan.Zero;
+
+            if (!TryGetGameTime())
+                return TimeSpan.Zero;
+
+            long nowTicks = gameTime.CurrentDateTime.Ticks;
+            long elapsedTicks = nowTicks - state.StartTick;
+            long totalGameTicks = state.TotalChars * TicksPerChar;
+
+            if (elapsedTicks >= totalGameTicks)
+                return TimeSpan.Zero;
+
+            long remainingGameTicks = totalGameTicks - elapsedTicks;
+            double speed = GetGameSpeed();
+
+            if (speed <= 0.001)
+                return TimeSpan.MaxValue;
+
+            long remainingRealTicks = (long)(remainingGameTicks / speed);
+            return TimeSpan.FromTicks(remainingRealTicks);
+        }
 
         public static void Init()
         {
@@ -39,6 +126,7 @@ namespace EnigmaMod
             savePath = Path.Combine(Application.persistentDataPath, "EnigmaMod", "decryption.json");
             Debug.Log($"{LogTag}.Init: savePath='{savePath}'");
 
+            TryGetGameTime();
             Load();
         }
 
@@ -74,7 +162,7 @@ namespace EnigmaMod
                 return state.TotalChars;
             }
 
-            long nowTicks = DateTime.UtcNow.Ticks;
+            long nowTicks = gameTime.CurrentDateTime.Ticks;
             long elapsedTicks = nowTicks - state.StartTick;
             int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
 
@@ -99,8 +187,8 @@ namespace EnigmaMod
                 return;
             }
 
-            long startTick = DateTime.UtcNow.Ticks;
-            Debug.Log($"{LogTag}.StartDecryption('{messageId}'): totalChars={totalChars}, startTick={startTick}");
+            long startTick = gameTime.CurrentDateTime.Ticks;
+            Debug.Log($"{LogTag}.StartDecryption('{messageId}'): totalChars={totalChars}, startTick={startTick}, now={gameTime.CurrentDateTime:O}");
 
             states[messageId] = new DecryptionState
             {

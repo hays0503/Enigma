@@ -76,7 +76,7 @@ namespace EnigmaMod.Patches
                 int plainRevealed = PatchHelper.GetRevealedPlaintextChars(messageId);
                 string revealedText = (rawText ?? "").Substring(0, Math.Min(plainRevealed, rawText?.Length ?? 0));
 
-                __result = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, ciphertext.Length, revealedText));
+                __result = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, ciphertext.Length, revealedText, messageId));
 
                 RegisterUpdateListener(__instance);
             }
@@ -202,12 +202,12 @@ namespace EnigmaMod.Patches
 
             Debug.Log($"{LogTag}.RefreshRadioDisplay: updating display — revealed={revealed}/{totalChars}, radioman='{radiomanName}'");
 
-            var newContents = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, totalChars, revealedText));
+            var newContents = LocalizedString.CreateUnlocalized(BuildDecryptionView(radiomanName, revealed, totalChars, revealedText, ctx.MessageId));
             ContentsOverrideField.SetValue(story, newContents);
             OnUpdatedMethod.Invoke(story, null);
         }
 
-        private static string BuildDecryptionView(string radiomanName, int revealed, int totalChars, string revealedText)
+        private static string BuildDecryptionView(string radiomanName, int revealed, int totalChars, string revealedText, string messageId)
         {
             var sb = new StringBuilder();
             sb.Append($"==== {radiomanName} ====\n");
@@ -218,6 +218,13 @@ namespace EnigmaMod.Patches
             sb.Append($"\n{Localization.GetDecryptingLabel()}: {revealed}/{totalChars}\n\n");
             sb.Append(revealedText);
             sb.Append("<color=#00ff00>|</color>");
+
+            string remaining = PatchHelper.FormatRemainingTime(DecryptionRegistry.GetEstimatedTimeRemaining(messageId));
+            if (!string.IsNullOrEmpty(remaining))
+            {
+                sb.Append($"\n<color=#888888>{remaining}</color>");
+            }
+
             return sb.ToString();
         }
 
