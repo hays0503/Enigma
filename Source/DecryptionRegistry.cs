@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Time;
+using UBOAT.Game.Sandbox;
 using UnityEngine;
 
 namespace EnigmaMod
@@ -18,11 +19,13 @@ namespace EnigmaMod
         public bool IsDecrypted;
         public string Ciphertext;
         public string Plaintext;
+        public int RevealedCount;
     }
 
     [Serializable]
     public class DecryptionSaveData
     {
+        public string CampaignId;
         public List<DecryptionState> States;
     }
 
@@ -36,7 +39,10 @@ namespace EnigmaMod
         private static long lastSpeedGameTick;
         private static double cachedGameSpeed = 1.0;
         private const long TicksPerChar = 10000000L;
+        private const long SaveIntervalTicks = 5 * TimeSpan.TicksPerSecond;
         private const string LogTag = "[EnigmaMod] DecryptionRegistry";
+        private static string currentCampaignId;
+        private static long lastSaveRealTick;
 
         private static bool TryGetGameTime()
         {
@@ -100,6 +106,21 @@ namespace EnigmaMod
             return cachedGameSpeed;
         }
 
+        private static string GetCampaignId()
+        {
+            if (currentCampaignId != null)
+                return currentCampaignId;
+
+            var career = InjectionFramework.Instance.GetInstance<PlayerCareer>();
+            if (career != null && !string.IsNullOrEmpty(career.StartScenarioId))
+            {
+                currentCampaignId = $"{career.StartScenarioId}_{career.StartDate.Ticks}";
+                Debug.Log($"{LogTag}.GetCampaignId: '{currentCampaignId}'");
+                return currentCampaignId;
+            }
+            return null;
+        }
+
         public static TimeSpan GetEstimatedTimeRemaining(string messageId)
         {
             if (!states.TryGetValue(messageId, out var state) || state.IsDecrypted)
@@ -134,6 +155,7 @@ namespace EnigmaMod
             Debug.Log($"{LogTag}.Init: savePath='{savePath}'");
 
             TryGetGameTime();
+            GetCampaignId();
             Load();
         }
 
@@ -177,15 +199,30 @@ namespace EnigmaMod
 
             long nowTicks = gameTime.CurrentDateTime.Ticks;
             long elapsedTicks = nowTicks - state.StartTick;
-            int revealed = Math.Min(state.TotalChars, (int)(elapsedTicks / TicksPerChar));
+            int timeBased = Math.Min(state.TotalChars, Math.Max(0, (int)(elapsedTicks / TicksPerChar)));
+            int revealed = Math.Max(timeBased, state.RevealedCount);
+            revealed = Math.Min(state.TotalChars, revealed);
 
-            Debug.Log($"{LogTag}.GetProgress('{messageId}'): nowTick={nowTicks}, startTick={state.StartTick}, elapsedTicks={elapsedTicks}, ticksPerChar={TicksPerChar}, revealed={revealed}/{state.TotalChars}");
+            Debug.Log($"{LogTag}.GetProgress('{messageId}'): nowTick={nowTicks}, startTick={state.StartTick}, elapsedTicks={elapsedTicks}, ticksPerChar={TicksPerChar}, timeBased={timeBased}, savedRevealed={state.RevealedCount}, revealed={revealed}/{state.TotalChars}");
 
             if (revealed >= state.TotalChars)
             {
                 state.IsDecrypted = true;
+                state.RevealedCount = state.TotalChars;
                 Debug.Log($"{LogTag}.GetProgress('{messageId}'): COMPLETE — marking as decrypted");
                 Save();
+                return revealed;
+            }
+
+            if (revealed != state.RevealedCount)
+            {
+                state.RevealedCount = revealed;
+                long nowReal = DateTime.UtcNow.Ticks;
+                if (nowReal - lastSaveRealTick > SaveIntervalTicks)
+                {
+                    lastSaveRealTick = nowReal;
+                    Save();
+                }
             }
 
             return revealed;
@@ -217,7 +254,8 @@ namespace EnigmaMod
                 PlaintextLength = plaintext?.Length ?? 0,
                 IsDecrypted = false,
                 Ciphertext = ciphertext,
-                Plaintext = plaintext
+                Plaintext = plaintext,
+                RevealedCount = 0
             };
             Save();
         }
@@ -264,10 +302,15 @@ namespace EnigmaMod
                     Debug.Log($"{LogTag}.Save: created directory '{dir}'");
                 }
 
-                var data = new DecryptionSaveData { States = new List<DecryptionState>(states.Values) };
+                string campaignId = currentCampaignId ?? GetCampaignId();
+                var data = new DecryptionSaveData
+                {
+                    CampaignId = campaignId,
+                    States = new List<DecryptionState>(states.Values)
+                };
                 string json = JsonUtility.ToJson(data, true);
                 File.WriteAllText(savePath, json);
-                Debug.Log($"{LogTag}.Save: saved {states.Count} states to '{savePath}' ({json.Length} bytes)");
+                Debug.Log($"{LogTag}.Save: saved {states.Count} states (campaign='{campaignId}') ({json.Length} bytes)");
             }
             catch (Exception e)
             {
@@ -289,12 +332,25 @@ namespace EnigmaMod
                 var data = JsonUtility.FromJson<DecryptionSaveData>(json);
                 if (data?.States != null)
                 {
+                    string storedCampaignId = data.CampaignId;
+                    if (string.IsNullOrEmpty(storedCampaignId))
+                    {
+                        Debug.LogWarning($"{LogTag}.Load: save file has no CampaignId (old version), discarding states");
+                        return;
+                    }
+
+                    if (currentCampaignId == null || storedCampaignId != currentCampaignId)
+                    {
+                        Debug.Log($"{LogTag}.Load: CampaignId mismatch (stored='{storedCampaignId}', current='{currentCampaignId}'), discarding states");
+                        return;
+                    }
+
                     states.Clear();
                     foreach (var state in data.States)
                         states[state.MessageId] = state;
-                    Debug.Log($"{LogTag}.Load: loaded {states.Count} states from '{savePath}' ({json.Length} bytes)");
+                    Debug.Log($"{LogTag}.Load: loaded {states.Count} states for campaign '{storedCampaignId}' ({json.Length} bytes)");
                     foreach (var kv in states)
-                        Debug.Log($"{LogTag}.Load:   '{kv.Key}': totalChars={kv.Value.TotalChars}, isDecrypted={kv.Value.IsDecrypted}, startTick={kv.Value.StartTick}");
+                        Debug.Log($"{LogTag}.Load:   '{kv.Key}': totalChars={kv.Value.TotalChars}, isDecrypted={kv.Value.IsDecrypted}, startTick={kv.Value.StartTick}, revealed={kv.Value.RevealedCount}");
                 }
                 else
                 {
